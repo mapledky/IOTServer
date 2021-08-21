@@ -30,6 +30,11 @@
         <servlet-name>ServerMain</servlet-name>
         <servlet-class>com.rosal.iotplatform.main.ServerMain</servlet-class>
     </servlet>
+    <servlet>
+        <servlet-name>Mqtt</servlet-name>
+        <servlet-class>com.rosal.iotplatform.mqtt.Mqtt</servlet-class>
+        <load-on-startup>2</load-on-startup>
+    </servlet>
     <servlet-mapping>
         <servlet-name>dispatcher</servlet-name>
         <url-pattern>*.htm</url-pattern>

@@ -190,26 +190,15 @@ public class SMS extends HttpServlet {
                     注册或验证用户
                     
                      */
-                    String Id = null;
-                    JSONObject jSONObject_userinfo = IOTDAO.register(phoneNumber, password, "1");
-                    Id = jSONObject_userinfo.getString("Id");
-                    if (Id != null) {
-                        //获取到id
-                        jsonObject.put("result", "1");
-                        jsonObject.put("user_id", Id);
-                    } else {
-                        jsonObject.put("result", "0");
-                    }
+                    String user_id = null;
+                    jsonObject = IOTDAO.register(phoneNumber, password, "1");
                 } else {
-                    //超时或者未知错误
                     jsonObject.put("result", "2");
                 }
             } else {
-                //超时或者验证码错误
                 jsonObject.put("result", "2");
             }
         } else {
-            //超时或者验证码错误
             jsonObject.put("result", "2");
         }
         try ( PrintWriter out = response.getWriter()) {

@@ -5,8 +5,8 @@
  */
 package com.rosal.iotplatform.database;
 
-
 import com.mchange.v2.c3p0.ComboPooledDataSource;
+import com.rosal.iotplatform.util.PlatformUnion;
 import java.beans.PropertyVetoException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -25,10 +25,10 @@ public class C3P0Util extends HttpServlet {
     ServletConfig config;//定义一个ServletConfig对象
     private static ComboPooledDataSource cpds = new ComboPooledDataSource();
 
-    private static String user = "maple";
-    private static String password = "200105DuKeyu";
+    private static String user = PlatformUnion.MYSQL_username;
+    private static String password = PlatformUnion.MYSQL_password;
 
-    private static String expressDatabase = "jdbc:mysql://rm-bp1rhj2u2554p5up0.mysql.rds.aliyuncs.com:3306/maple_iot?useUnicode=true&characterEncoding=utf8&useSSL=false";
+    private static String expressDatabase = PlatformUnion.MYSQL_platformdata;
 
     @Override
     public void init(ServletConfig config) throws ServletException {
@@ -56,13 +56,15 @@ public class C3P0Util extends HttpServlet {
     }
 
     public static void setProperty(ComboPooledDataSource cpds) {
-        cpds.setAcquireIncrement(3);// 可以设置连接池的各种属性
-        cpds.setMaxPoolSize(10);
-        cpds.setMinPoolSize(3);
-        cpds.setMaxStatements(100);
+        cpds.setAcquireIncrement(10);// 可以设置连接池的各种属性
+        cpds.setMaxPoolSize(1000);
+        cpds.setAutoCommitOnClose(true);
         cpds.setCheckoutTimeout(3000);
-        cpds.setIdleConnectionTestPeriod(60);
-        cpds.setMaxIdleTime(60);
+        cpds.setMinPoolSize(3);
+        cpds.setMaxConnectionAge(20);
+        cpds.setMaxIdleTimeExcessConnections(20);
+        cpds.setMaxStatements(0);
+        cpds.setMaxIdleTime(10);
     }
 
     public static void close(Connection conn, PreparedStatement pst, ResultSet rs) {
