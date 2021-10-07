@@ -10,12 +10,19 @@ import com.cloopen.rest.sdk.BodyType;
 import com.cloopen.rest.sdk.CCPRestSmsSDK;
 import com.rosal.iotplatform.database.IOTDAO;
 import com.rosal.iotplatform.database.RedisUtil;
+import com.rosal.iotplatform.util.PlatformUnion;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.PrintWriter;
+import java.net.URL;
+import java.net.URLEncoder;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.net.ssl.HttpsURLConnection;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -75,10 +82,131 @@ public class SMS extends HttpServlet {
             case "002"://请求验证短信，并完成后续注册步骤
                 requestCheckSMS(request, response);
                 break;
+            case "003"://发送邮箱
+                requestMail(request, response);
+                break;
+            case "004"://验证邮箱
+                requestCheckMail(request, response);
+                break;
             default:
                 break;
 
         }
+    }
+
+    //请求发送邮件
+    private void requestMail(HttpServletRequest request, HttpServletResponse response) {
+        JSONObject jSONObject = new JSONObject();
+        String address = request.getParameter("address");
+
+        if (address == null) {
+            return;
+        }
+
+        int code = (int) (Math.random() * 8998.0) + 1000 + 1;//随机获取验证码
+        boolean requestTime = true;
+        //将数据加入缓存数据库存储,检测用户是否重复请求
+        if (RedisUtil.exist("sms_request" + address)) {
+            //检测是否在请求间隔60秒
+            Map data = RedisUtil.getMap("sms_request" + address);
+            /*
+                data格式
+                phoneNumber:xxx
+                smsCode:xxx
+                time:xxx(时间戳)
+             */
+            long timestate = System.currentTimeMillis();
+            if ((timestate - Long.parseLong((String) data.get("time"))) < 60000) {
+                //间隔小于60秒
+                requestTime = false;
+            }
+        }
+        if (requestTime) {
+            try {
+                URL url = new URL(PlatformUnion.mail_url);
+                HttpsURLConnection urlConnection = (HttpsURLConnection) url.openConnection();
+                // 设置请求方法
+                urlConnection.setRequestMethod("POST");
+                // 设置请求的超时时间
+                urlConnection.setReadTimeout(5000);
+                urlConnection.setConnectTimeout(5000);
+                // 传递的数据
+                String data = "apiUser=" + URLEncoder.encode(PlatformUnion.mail_api_user, "UTF-8")
+                        + "&apiKey=" + URLEncoder.encode(PlatformUnion.mail_api_key, "UTF-8")
+                        + "&fromName=" + URLEncoder.encode(PlatformUnion.mail_api_fromName, "UTF-8")
+                        + "&from=" + URLEncoder.encode(PlatformUnion.mail_api_from, "UTF-8")
+                        + "&to=" + URLEncoder.encode(address, "UTF-8")
+                        + "&subject=" + URLEncoder.encode("枫叶物联平台验证", "UTF-8")
+                        + "&plain=" + URLEncoder.encode("尊敬的用户，您的验证码为:" + String.valueOf(code) + ",请在5分钟内进行验证。", "UTF-8");
+                // 设置请求的头
+                urlConnection.setRequestProperty("Connection", "keep-alive");
+                urlConnection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+                urlConnection.setRequestProperty("Content-Length", String.valueOf(data.getBytes().length));
+                // 发送POST请求必须设置允许输出
+                urlConnection.setDoOutput(true);
+                // 发送POST请求必须设置允许输入
+                urlConnection.setDoInput(true);
+                // setDoInput的默认值就是true
+                // 获取输出流,将参数写入
+                OutputStream os;
+                os = urlConnection.getOutputStream();
+                os.write(data.getBytes());
+                os.flush();
+                os.close();
+                urlConnection.connect();
+
+                if (urlConnection.getResponseCode() == 200) {
+                    // 获取响应的输入流对象
+                    InputStream is = urlConnection.getInputStream();
+                    // 创建字节输出流对象
+                    ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+                    // 定义读取的长度
+                    int len = 0;
+                    // 定义缓冲区
+                    byte[] buffer = new byte[1024];
+                    // 按照缓冲区的大小，循环读取
+                    while ((len = is.read(buffer)) != -1) {
+                        // 根据读取的长度写入到os对象中
+                        byteArrayOutputStream.write(buffer, 0, len);
+                    }
+                    // 释放资源
+                    is.close();
+                    byteArrayOutputStream.close();
+                    // 返回字符串
+                    JSONObject result = JSONObject.parseObject(new String(byteArrayOutputStream.toByteArray()));
+                    if (result.getString("result").equals("true")) {
+                        //请求成功
+                        Map<String, String> data_redis = new HashMap<String, String>();
+                        long timestamp = System.currentTimeMillis();
+                        data_redis.put("phoneNumber", address);
+                        data_redis.put("smsCode", String.valueOf(code));
+                        data_redis.put("time", String.valueOf(timestamp));
+                        RedisUtil.delete("sms_request" + address);
+                        RedisUtil.setMap("sms_request" + address, data_redis, 300);//设置过期时间5分钟
+                        jSONObject.put("result", "1");
+                        jSONObject.put("sms_id", timestamp);
+                    } else {
+                        jSONObject.put("result", "0");
+                    }
+                } else {
+                    jSONObject.put("result", "0");
+                }
+
+            } catch (IOException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+                jSONObject.put("result", "0");
+            }
+        } else {
+            //用户重复请求次数过多，1分钟后再次请求
+            jSONObject.put("result", "2");
+        }
+        try ( PrintWriter out = response.getWriter()) {
+            out.write(jSONObject.toString());
+        } catch (IOException ex) {
+            Logger.getLogger(SMS.class.getName()).log(Level.SEVERE, null, ex);
+        }
+
     }
 
     //请求发送验证码
@@ -146,6 +274,57 @@ public class SMS extends HttpServlet {
         }
         try ( PrintWriter out = response.getWriter()) {
             out.write(jSONObject.toString());
+        } catch (IOException ex) {
+            Logger.getLogger(SMS.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+
+    //验证邮箱
+    private void requestCheckMail(HttpServletRequest request, HttpServletResponse response) {
+
+        String address;
+        String code;
+        String smsCode;
+        String password;
+
+        address = request.getParameter("address");
+        code = request.getParameter("code");
+        smsCode = request.getParameter("sms_id");
+        password = request.getParameter("password");
+
+        if (address == null || code == null || smsCode == null || password == null) {
+            return;
+        }
+
+        JSONObject jsonObject = new JSONObject();
+        //验证短信验证码
+        if (RedisUtil.exist("sms_request" + address)) {
+            Map data = RedisUtil.getMap("sms_request" + address);
+            //检测时间戳
+            long timestate = System.currentTimeMillis();
+            if (data.get("time").equals(smsCode) && (timestate - Long.parseLong((String) data.get("time"))) < 300000) {
+                //时间戳符合且时间小于5分钟
+                if (code.equals(data.get("smsCode"))) {
+                    //验证码符合要求
+                    //查找数据库匹配用户Id
+                    /*
+                    
+                    注册或验证用户
+                    
+                     */
+                    String user_id = null;
+                    jsonObject = IOTDAO.register(address, password, "2");
+                } else {
+                    jsonObject.put("result", "2");
+                }
+            } else {
+                jsonObject.put("result", "2");
+            }
+        } else {
+            jsonObject.put("result", "2");
+        }
+        try ( PrintWriter out = response.getWriter()) {
+            out.write(jsonObject.toString());
         } catch (IOException ex) {
             Logger.getLogger(SMS.class.getName()).log(Level.SEVERE, null, ex);
         }

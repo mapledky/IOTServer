@@ -150,8 +150,8 @@ public class LDAP {
         attrsbu.put("cn", uid);// 显示账号
         attrsbu.put("userPassword", "123456");// 显示密码
         attrsbu.put("homeDirectory", uid);// 显示home地址
-        attrsbu.put("uidNumber", 1);/* 显示id */
-        attrsbu.put("gidNumber", 1);/* 显示组id */
+        attrsbu.put("uidNumber", "1");/* 显示id */
+        attrsbu.put("gidNumber", "1");/* 显示组id */
         try {
             String dn = "uid=" + uid + ",ou=user,dc=server";
             context.createSubcontext(dn, attrsbu);

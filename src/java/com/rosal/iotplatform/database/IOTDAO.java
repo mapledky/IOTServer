@@ -130,6 +130,29 @@ public class IOTDAO {
         return jSONObject;
     }
 
+    //修改用户名
+    public static boolean changeUserName(String username,String user_id){
+        Connection connection = null;
+        PreparedStatement preparedStatement = null;
+        ResultSet resultSet = null;
+        
+        JSONObject jSONObject = new JSONObject();
+        String sql_update = "UPDATE userinfo SET username = ? WHERE user_id = ?";
+        try {
+            connection = C3P0Util.getConnection();
+            preparedStatement = connection.prepareStatement(sql_update);
+            preparedStatement.setString(1, username);
+            preparedStatement.setString(2, user_id);
+            preparedStatement.executeUpdate();
+
+            return true;
+        } catch (SQLException | PropertyVetoException ex) {
+            Logger.getLogger(IOTDAO.class.getName()).log(Level.SEVERE, null, ex);
+        } finally {
+            C3P0Util.close(connection, preparedStatement, resultSet);
+        }
+        return false;
+    }
     //获取用户信息
     public static JSONArray getUserinfo(String company_id) {
         Connection connection = null;
@@ -200,7 +223,7 @@ public class IOTDAO {
             preparedStatement.setString(1, user_id);
             resultSet = preparedStatement.executeQuery();
             if (resultSet.next()) {
-                if ((!resultSet.getString("modal").equals("3")) && (company_id.equals(resultSet.getString("company"))||company_id.equals("0"))) {
+                if ((!resultSet.getString("modal").equals("3")) && (company_id.equals(resultSet.getString("company")) || company_id.equals("0"))) {
                     preparedStatement = connection.prepareStatement(sql_search);
                     preparedStatement.setString(1, "0");
                     preparedStatement.setString(2, "1");
@@ -291,11 +314,11 @@ public class IOTDAO {
                 break;
             case "2":
                 sql_search = "SELECT * FROM userinfo WHERE email = ?";
-                sql_insert = "INSERT INTO userinfo (phoneNumber,email) VALUES (?,?)";
+                sql_insert = "INSERT INTO userinfo (email,password) VALUES (?,?)";
                 break;
             case "3":
                 sql_search = "SELECT * FROM userinfo WHERE otherplat = ?";
-                sql_insert = "INSERT INTO userinfo (phoneNumber,otherplat) VALUES (?,?)";
+                sql_insert = "INSERT INTO userinfo (otherplat,password) VALUES (?,?)";
                 break;
             default:
                 break;
@@ -567,6 +590,74 @@ public class IOTDAO {
         return false;
     }
 
+    //根据设备id获取设备
+    public static JSONObject getDeviceById(String sensor_id) {
+        Connection connection = null;
+        PreparedStatement preparedStatement = null;
+        ResultSet resultSet = null;
+        JSONObject jSONObject = new JSONObject();
+        String sql_search = "SELECT * FROM sensorinfo WHERE Id = ?";
+
+        try {
+            connection = C3P0Util.getConnection();
+            preparedStatement = connection.prepareStatement(sql_search);
+            preparedStatement.setString(1, sensor_id);
+            resultSet = preparedStatement.executeQuery();
+
+            if (resultSet.next()) {
+                jSONObject.put("sensor_id", resultSet.getString("Id"));
+                jSONObject.put("sensor_name", EmojiAdapter.emojiRecovery(resultSet.getString("sensor_name")));
+                jSONObject.put("company_id", resultSet.getString("company_id"));
+                jSONObject.put("create_time", resultSet.getString("create_time"));
+                jSONObject.put("product_id", resultSet.getString("product_id"));
+                jSONObject.put("latitude", resultSet.getString("latitude"));
+                jSONObject.put("longitude", resultSet.getString("longitude"));
+                jSONObject.put("dismiss", resultSet.getString("dismiss"));
+            }
+            return jSONObject;
+        } catch (SQLException | PropertyVetoException ex) {
+            Logger.getLogger(IOTDAO.class.getName()).log(Level.SEVERE, null, ex);
+        } finally {
+            C3P0Util.close(connection, preparedStatement, resultSet);
+        }
+        return jSONObject;
+    }
+    
+    //根据产品获取设备
+    public static JSONArray getDeviceByproduct(String product_id) {
+        Connection connection = null;
+        PreparedStatement preparedStatement = null;
+        ResultSet resultSet = null;
+        JSONArray jSONONArray = new JSONArray();
+        String sql_search = "SELECT * FROM sensorinfo WHERE product_id = ?";
+
+        try {
+            connection = C3P0Util.getConnection();
+            preparedStatement = connection.prepareStatement(sql_search);
+            preparedStatement.setString(1, product_id);
+            resultSet = preparedStatement.executeQuery();
+
+            while (resultSet.next()) {
+                JSONObject jSONObject = new JSONObject();
+                jSONObject.put("sensor_id", resultSet.getString("Id"));
+                jSONObject.put("sensor_name", EmojiAdapter.emojiRecovery(resultSet.getString("sensor_name")));
+                jSONObject.put("company_id", resultSet.getString("company_id"));
+                jSONObject.put("create_time", resultSet.getString("create_time"));
+                jSONObject.put("product_id", resultSet.getString("product_id"));
+                jSONObject.put("latitude", resultSet.getString("latitude"));
+                jSONObject.put("longitude", resultSet.getString("longitude"));
+                jSONObject.put("dismiss", resultSet.getString("dismiss"));
+                jSONONArray.add(jSONObject);
+            }
+            return jSONONArray;
+        } catch (SQLException | PropertyVetoException ex) {
+            Logger.getLogger(IOTDAO.class.getName()).log(Level.SEVERE, null, ex);
+        } finally {
+            C3P0Util.close(connection, preparedStatement, resultSet);
+        }
+        return jSONONArray;
+    }
+
     //获取设备
     public static JSONArray getDevice(String company_id) {
         Connection connection = null;
@@ -669,6 +760,39 @@ public class IOTDAO {
         }
         return "0";
     }
+    
+    
+    //根据id获取产品
+    public static JSONObject getProductById(String product_id){
+        Connection connection = null;
+        PreparedStatement preparedStatement = null;
+        ResultSet resultSet = null;
+        JSONObject jSONObject = new JSONObject();
+        String sql_search = "SELECT * FROM productinfo WHERE Id = ?";
+
+        try {
+            connection = C3P0Util.getConnection();
+            preparedStatement = connection.prepareStatement(sql_search);
+            preparedStatement.setString(1, product_id);
+            resultSet = preparedStatement.executeQuery();
+
+            if (resultSet.next()) {
+                jSONObject.put("product_id", resultSet.getString("Id"));
+                jSONObject.put("product_name", EmojiAdapter.emojiRecovery(resultSet.getString("product_name")));
+                jSONObject.put("product_des", EmojiAdapter.emojiRecovery(resultSet.getString("product_des")));
+                jSONObject.put("company_id", resultSet.getString("company_id"));
+                jSONObject.put("images", JSONArray.parse(resultSet.getString("images")));
+                jSONObject.put("data_format", JSONArray.parse(resultSet.getString("data_format")));
+                jSONObject.put("dismiss", resultSet.getString("dismiss"));
+            }
+            return jSONObject;
+        } catch (SQLException | PropertyVetoException ex) {
+            Logger.getLogger(IOTDAO.class.getName()).log(Level.SEVERE, null, ex);
+        } finally {
+            C3P0Util.close(connection, preparedStatement, resultSet);
+        }
+        return jSONObject;
+    }
 
     //获取所有产品]
     public static JSONArray getAllProduct(String company_id) {
@@ -732,14 +856,13 @@ public class IOTDAO {
     }
 
     //创建工厂
-    
-    public static String createFactory(String name,String latitude,String longitude){
+    public static String createFactory(String name, String latitude, String longitude) {
         Connection connection = null;
         PreparedStatement preparedStatement = null;
         ResultSet resultSet = null;
-        
+
         String createtime = String.valueOf(System.currentTimeMillis());
-        
+
         String sql_search = "INSERT INTO company (company_name,create_time,latitude,longitude) VALUES (?,?,?,?)";
 
         try {
@@ -766,6 +889,7 @@ public class IOTDAO {
         }
         return "0";
     }
+
     //创建新的产品
     public static String createProduct(String product_name, String product_des, String company_id, String images, String data_format) {
         Connection connection = null;

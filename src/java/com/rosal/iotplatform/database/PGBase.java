@@ -24,7 +24,20 @@ public class PGBase {
         try {
             Class.forName("org.postgresql.Driver");
             connection = DriverManager
-                    .getConnection(PlatformUnion.PGSQL_Mqtt_State,PlatformUnion.PGSQL_Username,PlatformUnion.PGSQL_password);
+                    .getConnection(PlatformUnion.PGSQL_Mqtt_State, PlatformUnion.PGSQL_Username, PlatformUnion.PGSQL_password);
+        } catch (ClassNotFoundException | SQLException ex) {
+            Logger.getLogger(PGBase.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return connection;
+    }
+
+    //连接实时数据数据库
+    public static Connection getConnectionToData() {
+        Connection connection = null;
+        try {
+            Class.forName("org.postgresql.Driver");
+            connection = DriverManager
+                    .getConnection(PlatformUnion.PGSQL_data_State, PlatformUnion.PGSQL_Username, PlatformUnion.PGSQL_password);
         } catch (ClassNotFoundException | SQLException ex) {
             Logger.getLogger(PGBase.class.getName()).log(Level.SEVERE, null, ex);
         }

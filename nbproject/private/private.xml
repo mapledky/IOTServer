@@ -2,11 +2,6 @@
 <project-private xmlns="http://www.netbeans.org/ns/project-private/1">
     <editor-bookmarks xmlns="http://www.netbeans.org/ns/editor-bookmarks/2" lastBookmarkId="0"/>
     <open-files xmlns="http://www.netbeans.org/ns/projectui-open-files/2">
-        <group>
-            <file>file:/Users/maple/Desktop/项目文件/server/IOTplatform/src/java/com/rosal/iotplatform/main/ServerMain.java</file>
-            <file>file:/Users/maple/Desktop/项目文件/server/IOTplatform/src/java/com/rosal/iotplatform/util/Mail.java</file>
-            <file>file:/Users/maple/Desktop/项目文件/server/IOTplatform/src/java/com/rosal/iotplatform/main/PrivilageUtil.java</file>
-            <file>file:/Users/maple/Desktop/项目文件/server/IOTplatform/src/java/com/rosal/iotplatform/database/IOTDAO.java</file>
-        </group>
+        <group/>
     </open-files>
 </project-private>

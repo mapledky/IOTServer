@@ -5,8 +5,17 @@
  */
 package com.rosal.iotplatform.mqtt;
 
+import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
+import com.rosal.iotplatform.database.PGBase;
 import java.io.IOException;
+import java.sql.Connection;
+import java.sql.Date;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.text.SimpleDateFormat;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.servlet.ServletConfig;
@@ -45,6 +54,12 @@ public class Mqtt extends HttpServlet {
 
         //订阅mqtt会话
         initMqtt();
+
+        //开启实时数据上传线程
+        UploadThread();
+
+        //24小时数据刷新
+        refreshData();
     }
 
     //初始化mqtt
@@ -76,20 +91,36 @@ public class Mqtt extends HttpServlet {
                 @Override
                 public void messageArrived(String topic, MqttMessage message) throws Exception {
                     String msg = new String(message.getPayload());
-                    
-                    if(topic.equals(MqttParam.iot_device_dead)){
+
+                    if (topic.equals(MqttParam.iot_device_dead)) {
                         //如果是网关掉线
                         //数据库网关状态置1
                     } else {
                         //实时数据上传
                         JSONObject jSONObject = JSONObject.parseObject(msg);
-                        String sensor_id = jSONObject.getString("sensor_id");
-                        String timestamp = jSONObject.getString("timestamp");
-                        String version = jSONObject.getString("version");
-                        String data_version = jSONObject.getString("data_version");
-                        JSONObject jSONObject_dataupload = JSONObject.parseObject(jSONObject.getString("data_upload"));
-                        
-                    }                 
+                        MqttMsg mqttdata = new MqttMsg();
+                        mqttdata.sensor_id = jSONObject.getString("sensor_id");
+                        mqttdata.company_id = jSONObject.getString("company_id");
+                        mqttdata.device_id = jSONObject.getString("device_id");
+                        mqttdata.timestamp = jSONObject.getString("timestamp");
+                        mqttdata.version = jSONObject.getString("version");
+                        mqttdata.data_version = jSONObject.getString("data_version");
+                        mqttdata.data_upload = jSONObject.getString("data_upload");
+
+                        //将消息存入对应设备实时数据队列
+                        if (SensorDevice.sensor_deivce.containsKey(mqttdata.sensor_id)) {
+                            //设备存在
+                            SensorDevice.sensor_deivce.get(mqttdata.sensor_id).addMessage(mqttdata);
+                        } else {
+                            //设备不存在
+                            SensorDevice newdevice = new SensorDevice();
+                            newdevice.company_id = mqttdata.company_id;
+                            newdevice.net_id = mqttdata.device_id;
+                            newdevice.sensor_id = mqttdata.sensor_id;
+                            newdevice.addMessage(mqttdata);
+                            SensorDevice.sensor_deivce.put(mqttdata.sensor_id, newdevice);
+                        }
+                    }
                 }
 
                 @Override
@@ -98,6 +129,7 @@ public class Mqtt extends HttpServlet {
 
                 @Override
                 public void connectionLost(Throwable throwable) {
+                    initMqtt();
                 }
             });
         } catch (MqttException ex) {
@@ -105,4 +137,83 @@ public class Mqtt extends HttpServlet {
         }
     }
 
+    //实时数据批量上传
+    private void UploadThread() {
+        new Thread(new Runnable() {
+            public void run() {
+                while (true) {
+                    try {
+                        //5分钟刷新一次
+                        Thread.sleep(5 * 60 * 1000);
+                    } catch (InterruptedException ex) {
+                        Logger.getLogger(Mqtt.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+
+                    Connection connection = PGBase.getConnectionToData();
+                    PreparedStatement preparedStatement = null;
+                    try {
+
+                        String sql_insert = "INSERT INTO lathe (time,sensor_id,data,device_id,company_id) VALUES (?,?,?,?,?)";
+
+                        //将数据存入时序数据库
+                        //iterating over values only
+                        for (SensorDevice device_val : SensorDevice.sensor_deivce.values()) {
+                            while (device_val.message.size() != 0) {
+                                try {
+                                    MqttMsg msg = device_val.message.take();
+                                    preparedStatement = connection.prepareStatement(sql_insert);
+                                    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+                                    Date date = new Date(Long.parseLong(msg.timestamp));
+
+                                    preparedStatement.setTimestamp(1, Timestamp.valueOf(sdf.format(date)));
+                                    preparedStatement.setString(2, msg.sensor_id);
+                                    preparedStatement.setString(3, msg.data_upload);
+                                    preparedStatement.setString(4, msg.device_id);
+                                    preparedStatement.setString(5, msg.company_id);
+                                    preparedStatement.executeUpdate();
+                                } catch (InterruptedException ex) {
+                                    Logger.getLogger(Mqtt.class.getName()).log(Level.SEVERE, null, ex);
+                                }
+                            }
+                        }
+
+                    } catch (SQLException ex) {
+                        Logger.getLogger(Mqtt.class.getName()).log(Level.SEVERE, null, ex);
+                    } finally {
+                        try {
+                            if (preparedStatement != null) {
+                                preparedStatement.close();
+                            }
+                            if (connection != null) {
+                                connection.close();
+                            }
+                        } catch (SQLException ex) {
+                            Logger.getLogger(Mqtt.class.getName()).log(Level.SEVERE, null, ex);
+                        }
+                    }
+
+                }
+            }
+        }).start();
+    }
+
+    //24小时数据刷新
+    private void refreshData() {
+        new Thread(new Runnable() {
+            public void run() {
+                while (true) {
+                    try {
+                        Thread.sleep(1000 * 60 * 60 * 24);
+                    } catch (InterruptedException ex) {
+                        Logger.getLogger(Mqtt.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+
+                    //刷新数据
+                    for (SensorDevice device_val : SensorDevice.sensor_deivce.values()) {
+                        device_val.msg_number = 0;
+                    }
+                }
+            }
+        }).start();
+    }
 }
