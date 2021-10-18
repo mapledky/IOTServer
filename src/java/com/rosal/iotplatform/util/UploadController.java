@@ -20,7 +20,7 @@ public class UploadController {
         MultipartFile multipartFile =  req.getFile("file");
      
         String name = request.getParameter("imagename");
-        String realPath = "Z:/data/iotplat";
+        String realPath = "Z:/projectdata_1001/iotplat";
         try {
             File dir = new File(realPath);
             if (!dir.exists()) {
